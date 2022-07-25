@@ -1,12 +1,11 @@
-import smtplib
+import os
 import random
-from email.message import EmailMessage
-from email.utils import make_msgid
-import mimetypes
 import json
+import requests
+from twilio.rest import Client
 from my_params import *
 
-    
+#--------------------------------------Motivational Messaage----------------------------#    
 with open("quotes_bank.json", "r") as file:
     all_quotes = json.loads(file.read())
 with open("emoji_bank.json", "r") as file:
@@ -15,35 +14,42 @@ with open("emoji_bank.json", "r") as file:
 quote_of_the_day = random.choice(all_quotes)
 emoji_of_the_day = random.choice(all_emoji)
 
-msg = EmailMessage()
-msg.set_content(f"{quote_of_the_day}\n{emoji_of_the_day}")
-msg["To"] = "kamil.testenv@yahoo.com"
-msg["From"] = my_email
-msg['Subject'] = "Motivational Mail!"
+message_content = (f"{quote_of_the_day}\n{emoji_of_the_day}")
+    
 
-image_cid = make_msgid(domain='gmail.com')
-msg.add_alternative(f"""\
-<html>
-    <body>
-        <img src="cid:{image_cid}">
-        <p>{quote_of_the_day}<br>
-            {emoji_of_the_day}
-        </p>
-        
-    </body>
-</html>
-""".format(image_cid=image_cid[1:-1]), subtype='html')
+#----------------------------------------Rain_Checker---------------------------------------------#
 
-with open('motivational_mail.png', 'rb') as img:
+parameter = {
+    "lat" : MY_LAT,
+    "lon" : MY_LONG,
+    "appid" : os.environ['OWM_API_KEY'],
+    "exclude" : "current,minutely,daily"
+}
+#Access OpenWeather Data
+response = requests.get(url="https://api.openweathermap.org/data/3.0/onecall", params=parameter)
+response.raise_for_status()
+weather_data = response.json()
 
-    maintype, subtype = mimetypes.guess_type(img.name)[0].split('/')
+#Taps unto the weather ID and checks if it's going to rain using IDs below 700 and then appends to a list of strings.
+is_it_raining = False
+for hour in range(12):
+    for weather in weather_data["hourly"][hour]["weather"]:
+        if weather["id"] < 700:
+            is_it_raining = True
+            break
 
-    msg.get_payload()[1].add_related(img.read(), 
-                                         maintype=maintype, 
-                                         subtype=subtype, 
-                                         cid=image_cid)
+if is_it_raining:
+    message_content += f"\n\nOh and It's going to rain today! Don't forget to bring your umbrella.☂️"
+    
+account_sid = os.environ['TWILIO_ACCOUNT_SID']
+auth_token = os.environ['TWILIO_AUTH_TOKEN']
 
-with smtplib.SMTP("smtp.gmail.com", port=587) as connection:
-    connection.starttls()
-    connection.login(user=my_email, password=password)
-    connection.send_message(msg)
+client = Client(account_sid, auth_token)
+
+message = client.messages \
+                .create(
+                    body=message_content,
+                    from_=MY_TWILIO_NUM,
+                    to=RECIPIENT_NUM,
+                )
+                
