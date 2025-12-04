@@ -19,7 +19,7 @@ The bot checks your weather for the next 12 hours using OpenWeather One Call API
 
 
 ## Tech Stack
-- Python 3-
+- Python 3
 - Twilio REST API
 - OpenWeather API (One Call 3.0)
 - JSON for quote/emoji storage
